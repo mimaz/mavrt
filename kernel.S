@@ -29,13 +29,20 @@ lasttime:
 
         .section .text
 
+        .global main
+        .weak main
+
+        .global mavrt_launch
         .global mavrt_lock_scheduler
         .global mavrt_unlock_scheduler
-        .global mavrt_launch
         .global mavrt_system_time
         .global mavrt_yield
         .global mavrt_schedule
         .global mavrt_systick
+
+main:
+        call    mavrt_yield
+        rjmp    main
 
         ; r24:r25 handler pointer
         ; r22:r23 handler data
@@ -65,9 +72,16 @@ mavrt_launch:
         movw    r22,    r30
         movw    r24,    r20
 
+        push    r20
+        push    r21
+
         rcall   mavrt_lock_scheduler
         call    mavrt_register
-        rjmp    mavrt_unlock_scheduler
+        rcall   mavrt_unlock_scheduler
+
+        pop     r25
+        pop     r24
+        ret
 
 .child:
         pop     r31
@@ -131,6 +145,9 @@ ctxswitch:
         lds     r18,    schedlock
         cpse    r18,    rzero
         ret
+
+        ser     r18
+        sts     schedlock,  r18
 
         ; make r2 usable just now
         ; to keep putback flag
@@ -205,6 +222,8 @@ ctxswitch:
         call    mavrt_context_time
         sts     lasttime+1, r25
         sts     lasttime+0, r24
+
+        sts     schedlock,  rzero
         ret
 
 mavrt_systick:

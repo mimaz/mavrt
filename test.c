@@ -12,7 +12,16 @@
 
 #include "mavrt.h"
 
-MAVRT_CONFIG(MAVRT_250HZ, TIMER2_COMPA_vect, TCNT2, 250)
+MAVRT_CONFIGURE(MAVRT_250HZ, TIMER2_COMPA_vect, TCNT2, 250)
+{
+    TCCR2A = _BV(WGM21);
+    TCCR2B = _BV(CS22) | _BV(CS21);
+    TIMSK2 = _BV(OCIE2A);
+    OCR2A = 250;
+
+    DDRB = 0xFF;
+    PORTB = 0;
+}
 
 void delay(uint16_t ms)
 {
@@ -22,11 +31,9 @@ void delay(uint16_t ms)
         mavrt_yield();
 }
 
-mavrt_thread *volatile task1, *volatile task2, *volatile task3;
-
-void blink1(void *data)
+MAVRT_DEFINE_THREAD(task1, 256)
 {
-    mavrt_pause(mavrt_current());
+    mavrt_pause(task1);
 
     while (1)
     {
@@ -37,7 +44,7 @@ void blink1(void *data)
     }
 }
 
-void blink2(void *data)
+MAVRT_DEFINE_THREAD(blink2, 256)
 {
     while (1)
     {
@@ -46,12 +53,12 @@ void blink2(void *data)
         MAVRT_NO_SCHEDULE(PORTB &= ~_BV(4))
         delay(951);
 
-        if (mavrt_time_millis() > 3000)
+        if (mavrt_time_millis() > 5000)
             mavrt_resume(task1);
     }
 }
 
-void blink3(void *data)
+MAVRT_DEFINE_THREAD(blink3, 256)
 {
     while (1)
     {
@@ -60,28 +67,4 @@ void blink3(void *data)
         MAVRT_NO_SCHEDULE(PORTB &= ~_BV(3))
         delay(53);
     }
-}
-
-int main()
-{
-    static uint8_t stack[256];
-    static uint8_t stack1[256];
-
-    cli();
-    DDRB = 0xFF;
-    PORTB = 0;
-
-    TCCR2A = _BV(WGM21);
-    TCCR2B = _BV(CS22) | _BV(CS21);
-    TIMSK2 = _BV(OCIE2A);
-    OCR2A = 250;
-    sei();
-
-    task1 = mavrt_current();
-    task2 = mavrt_launch(blink2, NULL, stack, sizeof(stack));
-    task3 = mavrt_launch(blink3, NULL, stack1, sizeof(stack1));
-
-    blink1((void *) 250);
-
-    return 0;
 }

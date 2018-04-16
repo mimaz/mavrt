@@ -19,14 +19,35 @@ extern "C" {
 #define MAVRT_250HZ 2
 #define MAVRT_125HZ 3
 
-#define MAVRT_CONFIG(mode, vect, tcnt, tcntmax) \
+#define MAVRT_CONFIGURE(mode, vect, tcnt, tcntmax) \
     __attribute__((naked)) \
     void vect(void) { __asm("sei"); __asm("jmp mavrt_systick"); } \
     extern volatile uint8_t mavrt_millis_lsb; \
     uint16_t mavrt_context_time(void) { \
         return tcnt + (uint16_t) mavrt_millis_lsb * tcntmax; } \
     uint32_t mavrt_time_millis(void) { \
-        return mavrt_system_time() << mode; }
+        return mavrt_system_time() << mode; } \
+    __attribute__((constructor)) \
+    void mavrt_configure(void); \
+    void mavrt_initialize(void) { \
+        __asm("cli"); \
+        mavrt_configure(); \
+        __asm("sei"); } \
+    void mavrt_configure(void)
+
+#define MAVRT_DEFINE_THREAD(name, ssiz) \
+    mavrt_thread *volatile name; \
+    uint8_t name##_stack[ssiz]; \
+    void name##_handler2(void); \
+    void name##_handler(void *unused) { \
+        (void) unused; \
+        name##_handler2(); } \
+    __attribute__((constructor)) \
+    void name##_initializer(void) { \
+        name = mavrt_launch(name##_handler, \
+                NULL, name##_stack, ssiz); \
+    } \
+    void name##_handler2(void)
 
 #define MAVRT_NO_SCHEDULE(expr) { \
     mavrt_lock_scheduler(); \

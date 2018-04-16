@@ -90,17 +90,13 @@ void mavrt_exit(void)
     while (1);
 }
 
-mavrt_thread *mavrt_register(mavrt_thread *node, void *sptr)
+void mavrt_register(mavrt_thread *node, void *sptr)
 {
     node->sptr = sptr;
     node->proctim = maxproctim + 1;
     node->flags = 0;
 
     ctxheap[ctxheapsiz++] = node;
-
-    bubble();
-
-    return node;
 }
 
 void *mavrt_switch(void *sptr, uint16_t usedtim, uint8_t pback)
