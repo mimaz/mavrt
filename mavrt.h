@@ -10,15 +10,6 @@
 #include <stdint.h>
 #include <avr/interrupt.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define MAVRT_1000HZ 0
-#define MAVRT_500HZ 1
-#define MAVRT_250HZ 2
-#define MAVRT_125HZ 3
-
 #define MAVRT_CONFIGURE(mode, vect, tcnt, tcntmax) \
     __attribute__((naked)) \
     void vect(void) { __asm("sei"); __asm("jmp mavrt_systick"); } \
@@ -29,10 +20,8 @@ extern "C" {
         return mavrt_system_time() << mode; } \
     __attribute__((constructor)) \
     void mavrt_configure(void); \
-    void mavrt_initialize(void) { \
-        __asm("cli"); \
-        mavrt_configure(); \
-        __asm("sei"); } \
+    void mavrt_initialize(void) { __asm("cli"); \
+        mavrt_configure(); __asm("sei"); } \
     void mavrt_configure(void)
 
 #define MAVRT_DEFINE_THREAD(name, ssiz) \
@@ -40,19 +29,25 @@ extern "C" {
     uint8_t name##_stack[ssiz]; \
     void name##_handler2(void); \
     void name##_handler(void *unused) { \
-        (void) unused; \
-        name##_handler2(); } \
+        (void) unused; name##_handler2(); } \
     __attribute__((constructor)) \
     void name##_initializer(void) { \
         name = mavrt_launch(name##_handler, \
-                NULL, name##_stack, ssiz); \
-    } \
+                NULL, name##_stack, ssiz); } \
     void name##_handler2(void)
 
 #define MAVRT_NO_SCHEDULE(expr) { \
-    mavrt_lock_scheduler(); \
-    { expr; } \
+    mavrt_lock_scheduler(); { expr; } \
     mavrt_unlock_scheduler(); }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define MAVRT_1000HZ 0
+#define MAVRT_500HZ 1
+#define MAVRT_250HZ 2
+#define MAVRT_125HZ 3
 
 typedef struct mavrt_thread     mavrt_thread;
 
@@ -80,6 +75,10 @@ void            mavrt_yield             (void);
 uint32_t        mavrt_system_time       (void);
 
 uint32_t        mavrt_time_millis       (void);
+
+void            mavrt_sleep             (uint32_t delay);
+
+void            mavrt_continue_sleep    (uint32_t delay);
 
 void            mavrt_kill              (mavrt_thread *thread);
 
