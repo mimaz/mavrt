@@ -31,7 +31,7 @@ static mavrt_thread mainctx;
 
 static mavrt_thread *ctxheap[MAX_THREADS] = { &mainctx };
 static uint8_t ctxheapsiz = 1;
-static uint32_t maxproctime;
+static uint32_t maxproctim;
 
 static mavrt_thread *volatile mavrt_context = &mainctx;
 
@@ -78,15 +78,6 @@ static void bubble(void)
     }
 }
 
-static void putback(void)
-{
-    head->proctim = ++maxproctime;
-
-    swapctx(0, ctxheapsiz - 1);
-
-    bubble();
-}
-
 mavrt_thread *mavrt_current(void)
 {
     return head;
@@ -102,7 +93,7 @@ void mavrt_exit(void)
 mavrt_thread *mavrt_register(mavrt_thread *node, void *sptr)
 {
     node->sptr = sptr;
-    node->proctim = maxproctime + 1;
+    node->proctim = maxproctim + 1;
     node->flags = 0;
 
     ctxheap[ctxheapsiz++] = node;
@@ -115,25 +106,30 @@ mavrt_thread *mavrt_register(mavrt_thread *node, void *sptr)
 void *mavrt_switch(void *sptr, uint16_t usedtim, uint8_t pback)
 {
     head->sptr = sptr;
-    
+    head->proctim += usedtim;
+
+
     if (pback)
     {
-        putback();
+        if (head->proctim <= maxproctim)
+            head->proctim = ++maxproctim;
+        else
+            maxproctim = head->proctim;
     }
     else
     {
-        head->proctim += usedtim;
-
-        if (head->proctim > maxproctime)
-            maxproctime = head->proctim;
-        
-        bubble();
+        if (head->proctim > maxproctim)
+            maxproctim = head->proctim;
     }
+    
+    bubble();
 
 
     while (head->flags & (FLAG_PAUSED | FLAG_KILLED))
     {
-        putback();
+        head->proctim = ++maxproctim;
+
+        bubble();
 
         if (head->flags & FLAG_KILLED)
             ctxheapsiz--;
@@ -148,9 +144,7 @@ void mavrt_kill(mavrt_thread *node)
     if (node == NULL)
         node = mavrt_current();
 
-    MAVRT_ATOMIC(node->flags |= FLAG_KILLED)
-
-    __asm("call mavrt_schedule");
+    MAVRT_NO_SCHEDULE(node->flags |= FLAG_KILLED)
 }
 
 void mavrt_pause(mavrt_thread *node)
@@ -158,9 +152,7 @@ void mavrt_pause(mavrt_thread *node)
     if (node == NULL)
         node = mavrt_current();
 
-    MAVRT_ATOMIC(node->flags |= FLAG_PAUSED)
-
-    __asm("call mavrt_schedule");
+    MAVRT_NO_SCHEDULE(node->flags |= FLAG_PAUSED)
 }
 
 void mavrt_resume(mavrt_thread *node)
@@ -168,7 +160,7 @@ void mavrt_resume(mavrt_thread *node)
     if (node == NULL)
         node = mavrt_current();
 
-    MAVRT_ATOMIC(node->flags &= ~FLAG_PAUSED)
+    MAVRT_NO_SCHEDULE(node->flags &= ~FLAG_PAUSED)
 }
 
 uint8_t mavrt_is_paused(mavrt_thread *node)

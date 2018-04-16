@@ -10,45 +10,6 @@ SREG    = 0x3F
 
 rzero   = 1
 
-        .macro push_volatile
-            push    r0
-            push    r1
-            in      r0,     SREG
-            push    r0
-            push    r18
-            push    r19
-            push    r20
-            push    r21
-            push    r22
-            push    r23
-            push    r24
-            push    r25
-            push    r26
-            push    r27
-            push    r30
-            push    r31
-            clr     rzero
-        .endm
-
-        .macro pop_volatile
-            pop     r31
-            pop     r30
-            pop     r27
-            pop     r26
-            pop     r25
-            pop     r24
-            pop     r23
-            pop     r22
-            pop     r21
-            pop     r20
-            pop     r19
-            pop     r18
-            pop     r0
-            out     SREG,   r0
-            pop     r1
-            pop     r0
-        .endm
-
         .section .bss
 
         .global mavrt_millis_lsb
@@ -57,7 +18,10 @@ mavrt_millis_lsb:
 timems:
         .byte   0, 0, 0, 0
 
-prelock:
+schedlock:
+        .byte   0
+
+lckdepth:
         .byte   0
 
 lasttime:
@@ -65,8 +29,8 @@ lasttime:
 
         .section .text
 
-        .global mavrt_enter_critical
-        .global mavrt_exit_critical
+        .global mavrt_lock_scheduler
+        .global mavrt_unlock_scheduler
         .global mavrt_launch
         .global mavrt_system_time
         .global mavrt_yield
@@ -82,60 +46,67 @@ mavrt_launch:
         add     r30,    r18
         adc     r31,    r19
 
-        in      r0,     SREG
         ldi     r18,    pm_lo8(.child)
         ldi     r19,    pm_hi8(.child)
 
-        st      -Z,     r18
-        st      -Z,     r19
-        st      -Z,     r0
-        st      -Z,     r1
-        st      -Z,     r0
-        st      -Z,     r18
-        st      -Z,     r19
-        st      -Z,     r20
-        st      -Z,     r21
+        ; start data
         st      -Z,     r22
         st      -Z,     r23
         st      -Z,     r24
         st      -Z,     r25
-        st      -Z,     r26
-        st      -Z,     r27
-        st      -Z,     rzero
-        st      -Z,     rzero
-        sbiw    r30,    18+1 ; volatile & offset
+
+        ; return address
+        st      -Z,     r18
+        st      -Z,     r19
+
+        ; fixed + offset
+        sbiw    r30,    16+1 
 
         movw    r22,    r30
         movw    r24,    r20
 
-        rcall   mavrt_enter_critical
+        rcall   mavrt_lock_scheduler
         call    mavrt_register
-        rjmp    mavrt_exit_critical
+        rjmp    mavrt_unlock_scheduler
 
 .child:
-        movw    r30,    r24
-        movw    r24,    r22
+        pop     r31
+        pop     r30
+        pop     r25
+        pop     r24
+
         icall
+
         call    mavrt_current
         jmp     mavrt_kill
 
-mavrt_enter_critical:
-        push    r16
-        ser     r16
-        sts     prelock,    r16
-        pop     r16
+mavrt_lock_scheduler:
+        ser     r18
+        sts     schedlock,  r18
+
+        lds     r18,    lckdepth
+        inc     r18
+        sts     lckdepth,   r18
+
         ret
 
-mavrt_exit_critical:
+mavrt_unlock_scheduler:
+        lds     r18,    lckdepth
+        dec     r18
+        sts     lckdepth,   r18
+
+        cpse    r18,    rzero
+        ret
+
+        sts     schedlock,  rzero
+
 mavrt_schedule:
-        push_volatile
         clr     r24
-        rjmp    .ctxswitch
+        rjmp    ctxswitch
 
 mavrt_yield:
-        push_volatile
         ser     r24
-        rjmp    .ctxswitch
+        rjmp    ctxswitch
 
 mavrt_system_time:
         lds     r18,    timems+0
@@ -155,51 +126,40 @@ mavrt_system_time:
         brne    mavrt_system_time
         ret
 
-mavrt_systick:
-        push_volatile
-
-        ; increment time
-        ldi     r18,    1
-        lds     r22,    timems+0
-        lds     r23,    timems+1
-        lds     r24,    timems+2
-        lds     r25,    timems+3
-        add     r22,    r18
-        adc     r23,    rzero
-        adc     r24,    rzero
-        adc     r25,    rzero
-        sts     timems+3,   r25
-        sts     timems+2,   r24
-        sts     timems+1,   r23
-        sts     timems+0,   r22
-
-        lds     r18,    prelock
-        cpse    r18,    rzero
-        rjmp    .skip_ctxswitch
-
-        clr     r24
-
         ; r24 putback flag
-.ctxswitch:
-        ser     r18
-        sts     prelock,    r18
+ctxswitch:
+        lds     r18,    schedlock
+        cpse    r18,    rzero
+        ret
 
-        push    r24 ; push putback flag
+        ; make r2 usable just now
+        ; to keep putback flag
+        push    r2
+
+        ser     r18
+        sts     schedlock,  r18
+
+        mov     r24,    r2 
         call    mavrt_context_time
         lds     r18,    lasttime+0
         lds     r19,    lasttime+1
         sub     r24,    r18
         sbc     r25,    r19
 
-        pop     r20 ; pop putback flag
+        ; get back putback flag
+        mov     r20,    r2
+
         movw    r22,    r24
         in      r24,    SPL
         in      r25,    SPH
-        sbiw    r24,    18
 
+        ; 17 - number of left registers to store below
+        sbiw    r24,    17 
+
+        ; run scheduler
         call    mavrt_switch
 
-        push    r2
+        ; store the rest of fixed registers
         push    r3
         push    r4
         push    r5
@@ -245,9 +205,61 @@ mavrt_systick:
         call    mavrt_context_time
         sts     lasttime+1, r25
         sts     lasttime+0, r24
+        ret
 
-        sts     prelock,    rzero
+mavrt_systick:
+        push    r0
+        push    r1
+        push    r18
+        push    r19
+        push    r20
+        push    r21
+        push    r22
+        push    r23
+        push    r24
+        push    r25
+        push    r26
+        push    r27
+        push    r30
+        push    r31
 
-.skip_ctxswitch:
-        pop_volatile
+        in      r0,     SREG
+        push    r0
+
+        clr     rzero
+
+        ; increment time
+        ldi     r18,    1
+        lds     r22,    timems+0
+        lds     r23,    timems+1
+        lds     r24,    timems+2
+        lds     r25,    timems+3
+        add     r22,    r18
+        adc     r23,    rzero
+        adc     r24,    rzero
+        adc     r25,    rzero
+        sts     timems+3,   r25
+        sts     timems+2,   r24
+        sts     timems+1,   r23
+        sts     timems+0,   r22
+
+        call    mavrt_schedule
+
+        pop     r0
+        out     SREG,   r0
+
+        pop     r31
+        pop     r30
+        pop     r27
+        pop     r26
+        pop     r25
+        pop     r24
+        pop     r23
+        pop     r22
+        pop     r21
+        pop     r20
+        pop     r19
+        pop     r18
+        pop     r1
+        pop     r0
         ret

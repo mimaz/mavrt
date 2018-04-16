@@ -30,9 +30,9 @@ void blink1(void *data)
 
     while (1)
     {
-        MAVRT_ATOMIC(PORTB |= _BV(5))
+        MAVRT_NO_SCHEDULE(PORTB |= _BV(5))
         delay(250);
-        MAVRT_ATOMIC(PORTB &= ~_BV(5))
+        MAVRT_NO_SCHEDULE(PORTB &= ~_BV(5))
         delay(250);
     }
 }
@@ -41,9 +41,9 @@ void blink2(void *data)
 {
     while (1)
     {
-        MAVRT_ATOMIC(PORTB |= _BV(4))
+        MAVRT_NO_SCHEDULE(PORTB |= _BV(4))
         delay(49);
-        MAVRT_ATOMIC(PORTB &= ~_BV(4))
+        MAVRT_NO_SCHEDULE(PORTB &= ~_BV(4))
         delay(951);
 
         if (mavrt_time_millis() > 3000)
@@ -55,9 +55,9 @@ void blink3(void *data)
 {
     while (1)
     {
-        MAVRT_ATOMIC(PORTB |= _BV(3))
+        MAVRT_NO_SCHEDULE(PORTB |= _BV(3))
         delay(279);
-        MAVRT_ATOMIC(PORTB &= ~_BV(3))
+        MAVRT_NO_SCHEDULE(PORTB &= ~_BV(3))
         delay(53);
     }
 }

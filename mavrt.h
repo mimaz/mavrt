@@ -28,10 +28,10 @@ extern "C" {
     uint32_t mavrt_time_millis(void) { \
         return mavrt_system_time() << mode; }
 
-#define MAVRT_ATOMIC(expr) { \
-    mavrt_enter_critical(); \
+#define MAVRT_NO_SCHEDULE(expr) { \
+    mavrt_lock_scheduler(); \
     { expr; } \
-    mavrt_exit_critical(); }
+    mavrt_unlock_scheduler(); }
 
 typedef struct mavrt_thread     mavrt_thread;
 
@@ -45,11 +45,14 @@ mavrt_thread   *mavrt_launch            (mavrt_handler  handler,
                                          void          *memory,
                                          uint16_t       memsiz);
 
-void            mavrt_exit              (void) __attribute__((noreturn));
+void            mavrt_exit              (void) 
+                __attribute__((noreturn));
 
-void            mavrt_enter_critical    (void);
+void            mavrt_lock_scheduler    (void);
 
-void            mavrt_exit_critical     (void);
+void            mavrt_unlock_scheduler  (void);
+
+void            mavrt_schedule          (void);
 
 void            mavrt_yield             (void);
 
