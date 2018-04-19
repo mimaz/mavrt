@@ -53,8 +53,8 @@ typedef struct mavrt_thread     mavrt_thread;
 
 typedef void                  (*mavrt_handler)(void *);
 
+extern mavrt_thread            *mavrt_context;
 
-mavrt_thread   *mavrt_current           (void);
 
 mavrt_thread   *mavrt_launch            (mavrt_handler  handler,
                                          void          *data,
@@ -80,15 +80,9 @@ void            mavrt_sleep             (uint32_t delay);
 
 void            mavrt_continue_sleep    (uint32_t delay);
 
-void            mavrt_kill              (mavrt_thread *thread);
-
-void            mavrt_pause             (mavrt_thread *thread);
+void            mavrt_pause             (void);
 
 void            mavrt_resume            (mavrt_thread *thread);
-
-uint8_t         mavrt_is_paused         (mavrt_thread *thread);
-
-uint8_t         mavrt_is_killed         (mavrt_thread *thread);
 
 #ifdef __cplusplus
 }

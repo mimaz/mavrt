@@ -91,8 +91,7 @@ mavrt_launch:
 
         icall
 
-        call    mavrt_current
-        jmp     mavrt_kill
+        jmp     mavrt_exit
 
 mavrt_lock_scheduler:
         ser     r18

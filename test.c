@@ -24,7 +24,7 @@ MAVRT_CONFIGURE(MAVRT_250HZ, TIMER2_COMPA_vect, TCNT2, 250)
 
 MAVRT_DEFINE_THREAD(task1, 256)
 {
-    mavrt_pause(task1);
+    mavrt_pause();
 
     while (1)
     {
