@@ -18,9 +18,6 @@ mavrt_millis_lsb:
 timems:
         .byte   0, 0, 0, 0
 
-schedlock:
-        .byte   0
-
 lckdepth:
         .byte   0
 
@@ -33,9 +30,7 @@ lasttime:
         .weak main
 
         .global mavrt_launch
-        .global mavrt_lock_scheduler
-        .global mavrt_unlock_scheduler
-        .global mavrt_system_time
+        .global mavrt_time_millis
         .global mavrt_yield
         .global mavrt_schedule
         .global mavrt_systick
@@ -75,9 +70,7 @@ mavrt_launch:
         push    r20
         push    r21
 
-        rcall   mavrt_lock_scheduler
         call    mavrt_register
-        rcall   mavrt_unlock_scheduler
 
         pop     r25
         pop     r24
@@ -93,26 +86,6 @@ mavrt_launch:
 
         jmp     mavrt_exit
 
-mavrt_lock_scheduler:
-        ser     r18
-        sts     schedlock,  r18
-
-        lds     r18,    lckdepth
-        inc     r18
-        sts     lckdepth,   r18
-
-        ret
-
-mavrt_unlock_scheduler:
-        lds     r18,    lckdepth
-        dec     r18
-        sts     lckdepth,   r18
-
-        cpse    r18,    rzero
-        ret
-
-        sts     schedlock,  rzero
-
 mavrt_schedule:
         clr     r24
         rjmp    ctxswitch
@@ -121,7 +94,7 @@ mavrt_yield:
         ser     r24
         rjmp    ctxswitch
 
-mavrt_system_time:
+mavrt_time_millis:
         lds     r18,    timems+0
         lds     r19,    timems+1
         lds     r20,    timems+2
@@ -136,24 +109,14 @@ mavrt_system_time:
         cpc     r19,    r23
         cpc     r20,    r24
         cpc     r21,    r25
-        brne    mavrt_system_time
+        brne    mavrt_time_millis
         ret
 
         ; r24 putback flag
 ctxswitch:
-        lds     r18,    schedlock
-        cpse    r18,    rzero
-        ret
-
-        ser     r18
-        sts     schedlock,  r18
-
         ; make r2 usable just now
         ; to keep putback flag
         push    r2
-
-        ser     r18
-        sts     schedlock,  r18
 
         mov     r24,    r2 
         call    mavrt_context_time
@@ -221,8 +184,6 @@ ctxswitch:
         call    mavrt_context_time
         sts     lasttime+1, r25
         sts     lasttime+0, r24
-
-        sts     schedlock,  rzero
         ret
 
 mavrt_systick:
@@ -261,8 +222,6 @@ mavrt_systick:
         sts     timems+1,   r23
         sts     timems+0,   r22
 
-        call    mavrt_schedule
-
         pop     r0
         out     SREG,   r0
 
@@ -280,4 +239,4 @@ mavrt_systick:
         pop     r18
         pop     r1
         pop     r0
-        ret
+        reti

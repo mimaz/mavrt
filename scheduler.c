@@ -84,11 +84,7 @@ static void updateheap(void)
 
 void mavrt_exit(void)
 {
-    mavrt_lock_scheduler();
-
     context->flags |= FLAG_KILLED;
-
-    mavrt_unlock_scheduler();
 
     while (1)
         mavrt_schedule();
@@ -157,44 +153,30 @@ void *mavrt_switch(void *sptr, uint16_t usedtim, uint8_t pback)
 
 void mavrt_pause(void)
 {
-    mavrt_lock_scheduler();
-
     context->flags |= FLAG_PAUSED;
-
-    mavrt_unlock_scheduler();
 }
 
 void mavrt_resume(mavrt_thread *node)
 {
-    mavrt_lock_scheduler();
-
     node->flags &= ~FLAG_PAUSED;
-
-    mavrt_unlock_scheduler();
 }
 
 void mavrt_sleep(uint32_t delay)
 {
     uint32_t waketim = mavrt_time_millis() + delay;
 
-
-    mavrt_lock_scheduler();
-
     context->flags |= FLAG_SLEEP; 
     context->waketim = waketim;
 
-    mavrt_unlock_scheduler();
+    mavrt_schedule();
 }
 
 void mavrt_continue_sleep(uint32_t delay)
 {
     uint32_t waketim = context->waketim + delay;
 
-
-    mavrt_lock_scheduler();
-
     context->flags |= FLAG_SLEEP; 
     context->waketim = waketim;
 
-    mavrt_unlock_scheduler();
+    mavrt_schedule();
 }
