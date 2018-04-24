@@ -100,24 +100,13 @@ void mavrt_register(mavrt_thread *node, void *sptr)
     ctxheap[ctxheapsiz++] = node;
 }
 
-void *mavrt_switch(void *sptr, uint16_t usedtim, uint8_t pback)
+void *mavrt_switch(void *sptr, uint32_t usedtim)
 {
     context->sptr = sptr;
     context->proctim += usedtim;
 
-
-    if (pback)
-    {
-        if (context->proctim <= maxproctim)
-            context->proctim = ++maxproctim;
-        else
-            maxproctim = context->proctim;
-    }
-    else
-    {
-        if (context->proctim > maxproctim)
-            maxproctim = context->proctim;
-    }
+    if (context->proctim > maxproctim)
+        maxproctim = context->proctim;
     
     updateheap();
 

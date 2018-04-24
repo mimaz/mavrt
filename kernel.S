@@ -12,17 +12,15 @@ rzero   = 1
 
         .section .bss
 
-        .global mavrt_millis_lsb
+        .global mavrt_timems
+        .extern mavrt_tcntmax
 
-mavrt_millis_lsb:
+mavrt_timems:
 timems:
         .byte   0, 0, 0, 0
 
-lckdepth:
-        .byte   0
-
 lasttime:
-        .byte   0, 0
+        .byte   0, 0, 0, 0
 
         .section .text
 
@@ -36,6 +34,7 @@ lasttime:
         .global mavrt_systick
 
 main:
+        sei
         call    mavrt_yield
         rjmp    main
 
@@ -86,14 +85,6 @@ mavrt_launch:
 
         jmp     mavrt_exit
 
-mavrt_schedule:
-        clr     r24
-        rjmp    ctxswitch
-
-mavrt_yield:
-        ser     r24
-        rjmp    ctxswitch
-
 mavrt_time_millis:
         lds     r18,    timems+0
         lds     r19,    timems+1
@@ -112,33 +103,56 @@ mavrt_time_millis:
         brne    mavrt_time_millis
         ret
 
-        ; r24 putback flag
-ctxswitch:
-        ; make r2 usable just now
-        ; to keep putback flag
-        push    r2
+mavrt_yield:
+        lds     r18,    mavrt_tcntmax+0
+        lds     r19,    mavrt_tcntmax+1
+    
+        lds     r20,    lasttime+0
+        lds     r21,    lasttime+1
+        lds     r22,    lasttime+2
+        lds     r23,    lasttime+3
 
-        mov     r24,    r2 
+        sub     r20,    r18
+        sbc     r21,    r19
+        sbc     r22,    rzero
+        sbc     r23,    rzero
+
+        sts     lasttime+3, r23
+        sts     lasttime+2, r22
+        sts     lasttime+1, r21
+        sts     lasttime+0, r20
+
+mavrt_schedule:
         call    mavrt_context_time
         lds     r18,    lasttime+0
         lds     r19,    lasttime+1
-        sub     r24,    r18
-        sbc     r25,    r19
+        lds     r20,    lasttime+2
+        lds     r21,    lasttime+3
 
-        ; get back putback flag
-        mov     r20,    r2
+        sts     lasttime+3, r25
+        sts     lasttime+2, r24
+        sts     lasttime+1, r23
+        sts     lasttime+0, r22
 
+        sub     r22,    r18
+        sbc     r23,    r19
+        sbc     r24,    r20
+        sbc     r25,    r21
+
+        movw    r20,    r22
         movw    r22,    r24
+
         in      r24,    SPL
         in      r25,    SPH
 
         ; 17 - number of left registers to store below
-        sbiw    r24,    17 
+        sbiw    r24,    18 
 
         ; run scheduler
         call    mavrt_switch
 
-        ; store the rest of fixed registers
+        ; store fixed registers
+        push    r2
         push    r3
         push    r4
         push    r5
@@ -157,10 +171,8 @@ ctxswitch:
         push    r28
         push    r29
 
-        cli
         out     SPH,    r25
         out     SPL,    r24
-        sei
 
         pop     r29
         pop     r28
@@ -181,9 +193,6 @@ ctxswitch:
         pop     r3
         pop     r2
 
-        call    mavrt_context_time
-        sts     lasttime+1, r25
-        sts     lasttime+0, r24
         ret
 
 mavrt_systick:

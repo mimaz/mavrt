@@ -13,9 +13,10 @@
 #define MAVRT_CONFIGURE(mode, vect, tcnt, tcntmax) \
     __attribute__((naked, interrupt)) \
     void vect(void) { __asm("jmp mavrt_systick"); } \
-    extern volatile uint8_t mavrt_millis_lsb; \
-    uint16_t mavrt_context_time(void) { \
-        return tcnt + (uint16_t) mavrt_millis_lsb * tcntmax; } \
+    extern volatile uint32_t mavrt_timems; \
+    volatile uint16_t mavrt_tcntmax = tcntmax; \
+    uint32_t mavrt_context_time(void) { \
+        return tcnt + (uint32_t) mavrt_timems * tcntmax; } \
     __attribute__((constructor)) \
     void mavrt_configure(void); \
     void mavrt_initialize(void) { \
