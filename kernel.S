@@ -196,56 +196,31 @@ mavrt_schedule:
         ret
 
 mavrt_systick:
-        push    r0
-        push    r1
-        push    r18
-        push    r19
+        push    r16
         push    r20
-        push    r21
-        push    r22
-        push    r23
-        push    r24
-        push    r25
-        push    r26
-        push    r27
-        push    r30
-        push    r31
+        in      r20,    SREG
+        push    r20
 
-        in      r0,     SREG
-        push    r0
+        ldi     r20,    1
+        lds     r16,    timems+0
+        add     r16,    r20
+        sts     timems+0,   r16
 
-        clr     rzero
+        clr     r20
+        lds     r16,    timems+1
+        adc     r16,    r20
+        sts     timems+1,   r16
 
-        ; increment time
-        ldi     r18,    1
-        lds     r22,    timems+0
-        lds     r23,    timems+1
-        lds     r24,    timems+2
-        lds     r25,    timems+3
-        add     r22,    r18
-        adc     r23,    rzero
-        adc     r24,    rzero
-        adc     r25,    rzero
-        sts     timems+3,   r25
-        sts     timems+2,   r24
-        sts     timems+1,   r23
-        sts     timems+0,   r22
+        lds     r16,    timems+2
+        adc     r16,    r20
+        sts     timems+2,   r16
 
-        pop     r0
-        out     SREG,   r0
+        lds     r16,    timems+3
+        adc     r16,    r20
+        sts     timems+3,   r16
 
-        pop     r31
-        pop     r30
-        pop     r27
-        pop     r26
-        pop     r25
-        pop     r24
-        pop     r23
-        pop     r22
-        pop     r21
         pop     r20
-        pop     r19
-        pop     r18
-        pop     r1
-        pop     r0
+        out     SREG,   r20
+        pop     r20
+        pop     r16
         reti

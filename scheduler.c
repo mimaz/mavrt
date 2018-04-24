@@ -111,14 +111,11 @@ void *mavrt_switch(void *sptr, uint32_t usedtim)
     updateheap();
 
 
-    uint32_t time = mavrt_time_millis();
-
-
     while (context->flags & (FLAG_PAUSED | FLAG_KILLED | FLAG_SLEEP))
     {
         if (context->flags & FLAG_SLEEP)
         {
-            if (context->waketim <= time)
+            if (context->waketim <= mavrt_time_millis())
             {
                 context->flags &= ~FLAG_SLEEP;
                 continue;
