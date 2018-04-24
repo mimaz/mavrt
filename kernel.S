@@ -13,6 +13,7 @@ rzero   = 1
         .section .bss
 
         .global mavrt_timems
+        .global mavrt_intflag
         .extern mavrt_tcntmax
 
 mavrt_timems:
@@ -21,6 +22,10 @@ timems:
 
 lasttime:
         .byte   0, 0, 0, 0
+
+mavrt_intflag:
+intflag:
+        .byte   0
 
         .section .text
 
@@ -86,21 +91,16 @@ mavrt_launch:
         jmp     mavrt_exit
 
 mavrt_time_millis:
-        lds     r18,    timems+0
-        lds     r19,    timems+1
-        lds     r20,    timems+2
-        lds     r21,    timems+3
+        sts     intflag,    rzero
 
         lds     r22,    timems+0
         lds     r23,    timems+1
         lds     r24,    timems+2
         lds     r25,    timems+3
 
-        cp      r18,    r22
-        cpc     r19,    r23
-        cpc     r20,    r24
-        cpc     r21,    r25
-        brne    mavrt_time_millis
+        lds     r20,    intflag
+        cpse    r20,    rzero
+        rjmp    mavrt_time_millis
         ret
 
 mavrt_yield:
@@ -202,6 +202,8 @@ mavrt_systick:
         push    r20
 
         ldi     r20,    1
+        sts     intflag,    r20
+
         lds     r16,    timems+0
         add     r16,    r20
         sts     timems+0,   r16
