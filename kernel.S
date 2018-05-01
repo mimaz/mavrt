@@ -134,8 +134,10 @@ mavrt_schedule:
         push    r28
         push    r29
 
+        cli
         out     SPH,    r25
         out     SPL,    r24
+        sei
 
         pop     r29
         pop     r28
