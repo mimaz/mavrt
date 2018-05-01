@@ -34,30 +34,25 @@ intflag:
 
         .global mavrt_launch
         .global mavrt_time_millis
-        .global mavrt_yield
         .global mavrt_schedule
         .global mavrt_systick
 
 main:
         sei
-        call    mavrt_yield
-        rjmp    main
+        jmp     mavrt_exit
 
         ; r24:r25 handler pointer
-        ; r22:r23 handler data
-        ; r20:r21 memory
-        ; r18:r19 memory size
+        ; r22:r23 memory
+        ; r20:r21 memory size
 mavrt_launch:
-        movw    r30,    r20
-        add     r30,    r18
-        adc     r31,    r19
+        movw    r30,    r22
+        add     r30,    r20
+        adc     r31,    r21
 
         ldi     r18,    pm_lo8(.child)
         ldi     r19,    pm_hi8(.child)
 
-        ; start data
-        st      -Z,     r22
-        st      -Z,     r23
+        ; handler
         st      -Z,     r24
         st      -Z,     r25
 
@@ -68,21 +63,12 @@ mavrt_launch:
         ; fixed + offset
         sbiw    r30,    16+1 
 
+        movw    r24,    r22
         movw    r22,    r30
-        movw    r24,    r20
 
-        push    r20
-        push    r21
-
-        call    mavrt_register
-
-        pop     r25
-        pop     r24
-        ret
+        jmp     mavrt_register
 
 .child:
-        pop     r31
-        pop     r30
         pop     r25
         pop     r24
 
@@ -103,36 +89,13 @@ mavrt_time_millis:
         rjmp    mavrt_time_millis
         ret
 
-mavrt_yield:
-        lds     r18,    mavrt_tcntmax+0
-        lds     r19,    mavrt_tcntmax+1
-    
-        lds     r20,    lasttime+0
-        lds     r21,    lasttime+1
-        lds     r22,    lasttime+2
-        lds     r23,    lasttime+3
-
-        sub     r20,    r18
-        sbc     r21,    r19
-        sbc     r22,    rzero
-        sbc     r23,    rzero
-
-        sts     lasttime+3, r23
-        sts     lasttime+2, r22
-        sts     lasttime+1, r21
-        sts     lasttime+0, r20
-
 mavrt_schedule:
         call    mavrt_context_time
+
         lds     r18,    lasttime+0
         lds     r19,    lasttime+1
         lds     r20,    lasttime+2
         lds     r21,    lasttime+3
-
-        sts     lasttime+3, r25
-        sts     lasttime+2, r24
-        sts     lasttime+1, r23
-        sts     lasttime+0, r22
 
         sub     r22,    r18
         sbc     r23,    r19
@@ -192,6 +155,13 @@ mavrt_schedule:
         pop     r4
         pop     r3
         pop     r2
+
+        call    mavrt_context_time
+
+        sts     lasttime+3, r25
+        sts     lasttime+2, r24
+        sts     lasttime+1, r23
+        sts     lasttime+0, r22
 
         ret
 

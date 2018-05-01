@@ -14,6 +14,8 @@
 
 #define context mavrt_context
 
+extern uint8_t mavrt_tcnt(void);
+
 enum
 {
     FLAG_PAUSED = 0x01,
@@ -25,6 +27,7 @@ struct mavrt_thread
 {
     uint32_t proctim;
     uint32_t waketim;
+    uint8_t waketcn;
     void *sptr;
     uint8_t flags;
 };
@@ -90,7 +93,7 @@ void mavrt_exit(void)
         mavrt_schedule();
 }
 
-void mavrt_register(mavrt_thread *node, void *sptr)
+void *mavrt_register(mavrt_thread *node, void *sptr)
 {
     node->proctim = maxproctim + 1;
     node->waketim = 0;
@@ -98,6 +101,8 @@ void mavrt_register(mavrt_thread *node, void *sptr)
     node->flags = 0;
 
     ctxheap[ctxheapsiz++] = node;
+
+    return node;
 }
 
 void *mavrt_switch(void *sptr, uint32_t usedtim)
@@ -115,10 +120,16 @@ void *mavrt_switch(void *sptr, uint32_t usedtim)
     {
         if (context->flags & FLAG_SLEEP)
         {
-            if (context->waketim <= mavrt_time_millis())
+            uint32_t crtim = mavrt_time_millis();
+            uint8_t crtcn = mavrt_tcnt();
+
+            uint32_t wktim = context->waketim;
+            uint8_t wktcn = context->waketcn;
+
+            if (wktim < crtim || (wktim == crtim && wktcn < crtcn))
             {
                 context->flags &= ~FLAG_SLEEP;
-                continue;
+                break;
             }
         }
 
@@ -126,11 +137,11 @@ void *mavrt_switch(void *sptr, uint32_t usedtim)
         context->proctim = ++maxproctim;
 
         swapctx(0, ctxheapsiz - 1);
-        updateheap();
-
 
         if (context->flags & FLAG_KILLED)
             ctxheapsiz--;
+
+        updateheap();
     }
 
 
@@ -149,20 +160,17 @@ void mavrt_resume(mavrt_thread *node)
 
 void mavrt_sleep(uint32_t delay)
 {
-    uint32_t waketim = mavrt_time_millis() + delay;
-
     context->flags |= FLAG_SLEEP; 
-    context->waketim = waketim;
+    context->waketim = mavrt_time_millis() + delay;
+    context->waketcn = mavrt_tcnt();
 
     mavrt_schedule();
 }
 
 void mavrt_continue_sleep(uint32_t delay)
 {
-    uint32_t waketim = context->waketim + delay;
-
     context->flags |= FLAG_SLEEP; 
-    context->waketim = waketim;
+    context->waketim += delay;
 
     mavrt_schedule();
 }
