@@ -31,6 +31,8 @@
                 name##_stack, ssiz); } \
     void name##_handler(void)
 
+#define MAVRT_UNLOCKED_MUTEX ((mavrt_mutex) 0)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +40,8 @@ extern "C" {
 typedef struct mavrt_thread     mavrt_thread;
 
 typedef void                  (*mavrt_handler)(void);
+
+typedef uint8_t                 mavrt_mutex;
 
 
 mavrt_thread   *mavrt_launch            (mavrt_handler  handler,
@@ -56,6 +60,10 @@ uint32_t        mavrt_time              (void);
 void            mavrt_sleep             (uint32_t delay);
 
 void            mavrt_continue_sleep    (uint32_t delay);
+
+void            mavrt_lock              (mavrt_mutex *mtx);
+
+void            mavrt_unlock            (mavrt_mutex *mtx);
 
 void            mavrt_pause             (void);
 

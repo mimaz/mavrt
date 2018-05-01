@@ -32,6 +32,8 @@ intflag:
         .global mavrt_launch
         .global mavrt_time
         .global mavrt_schedule
+        .global mavrt_lock
+        .global mavrt_unlock
         .global mavrt_systick
 
 main:
@@ -140,6 +142,28 @@ mavrt_schedule:
         pop     r3
         pop     r2
 
+        ret
+
+mavrt_lock:
+        push    r28
+        push    r29
+        movw    r28,    r24
+.check:
+        ld      r20,    Y
+        cpse    r20,    rzero
+        rjmp    .locked
+        ser     r18
+        st      Y,      r18
+        pop     r29
+        pop     r28
+        ret
+.locked:
+        call    mavrt_schedule
+        rjmp    .check
+
+mavrt_unlock:
+        movw    r26,    r24
+        st      X,      rzero
         ret
 
 mavrt_systick:
