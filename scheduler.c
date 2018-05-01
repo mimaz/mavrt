@@ -12,10 +12,6 @@
 #define NULL ((void *) 0)
 #endif
 
-#define context mavrt_context
-
-extern uint8_t mavrt_tcnt(void);
-
 enum
 {
     FLAG_PAUSED = 0x01,
@@ -25,9 +21,8 @@ enum
 
 struct mavrt_thread
 {
-    uint32_t proctim;
     uint32_t waketim;
-    uint8_t waketcn;
+    mavrt_thread *next;
     void *sptr;
     uint8_t flags;
 };
@@ -35,59 +30,47 @@ struct mavrt_thread
 
 static mavrt_thread mainctx;
 
-mavrt_thread *mavrt_context = &mainctx;
+static mavrt_thread *rootnd = &mainctx;
+static mavrt_thread *currnd = &mainctx;
+static mavrt_thread *prevnd = NULL;
 
-static mavrt_thread *ctxheap[MAX_THREADS] = { &mainctx };
-static uint8_t ctxheapsiz = 1;
-static uint32_t maxproctim;
-
-
-static mavrt_thread *volatile tail = &mainctx;
-
-static uint8_t childid(uint8_t id)
+static void nextctx(void)
 {
-    return id * 2 + 1;
-}
+    prevnd = currnd;
+    currnd = currnd->next;
 
-static void swapctx(uint8_t pid, uint8_t qid)
-{
-    mavrt_thread *tmp = ctxheap[pid];
-
-    ctxheap[pid] = ctxheap[qid];
-    ctxheap[qid] = tmp;
-}
-
-static void updateheap(void)
-{
-    uint8_t idx = 0, chl = childid(idx);
-
-    while (chl < ctxheapsiz)
+    if (currnd == NULL)
     {
-        if (chl + 1 < ctxheapsiz 
-                && ctxheap[chl + 1]->proctim < ctxheap[chl]->proctim)
-        {
-            chl++;
-        }
-
-        if (ctxheap[chl]->proctim < ctxheap[idx]->proctim)
-        {
-            swapctx(idx, chl);
-
-            idx = chl;
-            chl = childid(idx);
-
-            continue;
-        }
-
-        break;
+        prevnd = NULL;
+        currnd = rootnd;
     }
+}
 
-    context = ctxheap[0];
+static void remctx(void)
+{
+    if (prevnd != NULL)
+    {
+        if (currnd->next != NULL)
+        {
+            prevnd->next = currnd->next;
+            currnd = currnd->next;
+        }
+        else
+        {
+            prevnd->next = NULL;
+            currnd = rootnd;
+        }
+    }
+    else
+    {
+        currnd = currnd->next;
+        rootnd = currnd;
+    }
 }
 
 void mavrt_exit(void)
 {
-    context->flags |= FLAG_KILLED;
+    currnd->flags |= FLAG_KILLED;
 
     while (1)
         mavrt_schedule();
@@ -95,62 +78,44 @@ void mavrt_exit(void)
 
 void *mavrt_register(mavrt_thread *node, void *sptr)
 {
-    node->proctim = maxproctim + 1;
     node->waketim = 0;
+    node->next = rootnd;
     node->sptr = sptr;
     node->flags = 0;
 
-    ctxheap[ctxheapsiz++] = node;
+    rootnd = node;
 
     return node;
 }
 
-void *mavrt_switch(void *sptr, uint32_t usedtim)
+void *mavrt_switch(void *sptr)
 {
-    context->sptr = sptr;
-    context->proctim += usedtim;
+    currnd->sptr = sptr;
 
-    if (context->proctim > maxproctim)
-        maxproctim = context->proctim;
-    
-    updateheap();
+    nextctx();
 
 
-    while (context->flags & (FLAG_PAUSED | FLAG_KILLED | FLAG_SLEEP))
+    while (currnd->flags & (FLAG_SLEEP | FLAG_PAUSED | FLAG_KILLED))
     {
-        if (context->flags & FLAG_SLEEP)
+        if (currnd->flags & FLAG_SLEEP && currnd->waketim < mavrt_time())
         {
-            uint32_t crtim = mavrt_time_millis();
-            uint8_t crtcn = mavrt_tcnt();
-
-            uint32_t wktim = context->waketim;
-            uint8_t wktcn = context->waketcn;
-
-            if (wktim < crtim || (wktim == crtim && wktcn < crtcn))
-            {
-                context->flags &= ~FLAG_SLEEP;
-                break;
-            }
+            currnd->flags &= ~FLAG_SLEEP;
+            break;
         }
 
+        if (currnd->flags & FLAG_KILLED)
+            remctx();
 
-        context->proctim = ++maxproctim;
-
-        swapctx(0, ctxheapsiz - 1);
-
-        if (context->flags & FLAG_KILLED)
-            ctxheapsiz--;
-
-        updateheap();
+        nextctx();
     }
 
 
-    return context->sptr;
+    return currnd->sptr;
 }
 
 void mavrt_pause(void)
 {
-    context->flags |= FLAG_PAUSED;
+    currnd->flags |= FLAG_PAUSED;
 }
 
 void mavrt_resume(mavrt_thread *node)
@@ -160,17 +125,20 @@ void mavrt_resume(mavrt_thread *node)
 
 void mavrt_sleep(uint32_t delay)
 {
-    context->flags |= FLAG_SLEEP; 
-    context->waketim = mavrt_time_millis() + delay;
-    context->waketcn = mavrt_tcnt();
+    // TODO
+    uint32_t waketim = mavrt_time() + delay + 1;
+
+    currnd->flags |= FLAG_SLEEP; 
+    currnd->waketim = waketim;
 
     mavrt_schedule();
 }
 
 void mavrt_continue_sleep(uint32_t delay)
 {
-    context->flags |= FLAG_SLEEP; 
-    context->waketim += delay;
+    // TODO
+    currnd->flags |= FLAG_SLEEP; 
+    currnd->waketim += delay + 1;
 
     mavrt_schedule();
 }

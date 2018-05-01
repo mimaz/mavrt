@@ -20,9 +20,6 @@ mavrt_timems:
 timems:
         .byte   0, 0, 0, 0
 
-lasttime:
-        .byte   0, 0, 0, 0
-
 mavrt_intflag:
 intflag:
         .byte   0
@@ -33,7 +30,7 @@ intflag:
         .weak main
 
         .global mavrt_launch
-        .global mavrt_time_millis
+        .global mavrt_time
         .global mavrt_schedule
         .global mavrt_systick
 
@@ -76,7 +73,7 @@ mavrt_launch:
 
         jmp     mavrt_exit
 
-mavrt_time_millis:
+mavrt_time:
         sts     intflag,    rzero
 
         lds     r22,    timems+0
@@ -86,25 +83,10 @@ mavrt_time_millis:
 
         lds     r20,    intflag
         cpse    r20,    rzero
-        rjmp    mavrt_time_millis
+        rjmp    mavrt_time
         ret
 
 mavrt_schedule:
-        call    mavrt_context_time
-
-        lds     r18,    lasttime+0
-        lds     r19,    lasttime+1
-        lds     r20,    lasttime+2
-        lds     r21,    lasttime+3
-
-        sub     r22,    r18
-        sbc     r23,    r19
-        sbc     r24,    r20
-        sbc     r25,    r21
-
-        movw    r20,    r22
-        movw    r22,    r24
-
         in      r24,    SPL
         in      r25,    SPH
 
@@ -157,13 +139,6 @@ mavrt_schedule:
         pop     r4
         pop     r3
         pop     r2
-
-        call    mavrt_context_time
-
-        sts     lasttime+3, r25
-        sts     lasttime+2, r24
-        sts     lasttime+1, r23
-        sts     lasttime+0, r22
 
         ret
 

@@ -15,14 +15,6 @@
     void vect(void) { __asm("jmp mavrt_systick"); } \
     extern volatile uint32_t mavrt_timems; \
     extern volatile uint8_t mavrt_intflag; \
-    uint8_t mavrt_tcnt(void) { \
-        return tcnt; } \
-    uint32_t mavrt_context_time(void) { \
-        uint32_t ctxtime; do { \
-            mavrt_intflag = 0; \
-            ctxtime = mavrt_timems * tcntmax + tcnt; \
-        } while (mavrt_intflag); \
-        return ctxtime; }\
     __attribute__((constructor)) \
     static void mavrt_configure(void); \
     void mavrt_initialize(void) { \
@@ -47,8 +39,6 @@ typedef struct mavrt_thread     mavrt_thread;
 
 typedef void                  (*mavrt_handler)(void);
 
-extern mavrt_thread            *mavrt_context;
-
 
 mavrt_thread   *mavrt_launch            (mavrt_handler  handler,
                                          void          *memory,
@@ -61,7 +51,7 @@ void            mavrt_schedule          (void);
 
 uint32_t        mavrt_system_time       (void);
 
-uint32_t        mavrt_time_millis       (void);
+uint32_t        mavrt_time              (void);
 
 void            mavrt_sleep             (uint32_t delay);
 
